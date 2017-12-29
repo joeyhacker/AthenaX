@@ -31,66 +31,76 @@ import java.util.Collections;
 import java.util.UUID;
 
 @javax.annotation.Generated(
-    value = "io.swagger.codegen.languages.JavaJerseyServerCodegen",
-    date = "2017-09-22T14:43:25.370-07:00")
+        value = "io.swagger.codegen.languages.JavaJerseyServerCodegen",
+        date = "2017-09-22T14:43:25.370-07:00")
 public class JobsApiServiceImpl extends JobsApiService {
-  public static final int INVALID_REQUEST = HttpStatus.SC_INTERNAL_SERVER_ERROR;
-  private final ServerContext ctx;
+    public static final int INVALID_REQUEST = HttpStatus.SC_INTERNAL_SERVER_ERROR;
+    private final ServerContext ctx;
 
-  public JobsApiServiceImpl(ServerContext ctx) {
-    this.ctx = ctx;
-  }
-
-  @Override
-  public Response allocateNewJob(SecurityContext securityContext) throws NotFoundException {
-    return Response.ok().entity(
-        Collections.singletonMap("job-uuid", ctx.jobManager().newJobUUID())
-    ).build();
-  }
-
-  @Override
-  public Response getJob(UUID jobUUID, SecurityContext securityContext) throws NotFoundException {
-    try {
-      JobDefinition job = ctx.jobManager().getJob(jobUUID);
-      if (job == null) {
-        return Response.status(Response.Status.NOT_FOUND).build();
-      } else {
-        return Response.ok(job).build();
-      }
-    } catch (IOException e) {
-      throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+    public JobsApiServiceImpl(ServerContext ctx) {
+        this.ctx = ctx;
     }
-  }
 
-  @Override
-  public Response listJob(SecurityContext securityContext) throws NotFoundException {
-    try {
-      return Response.ok(ctx.jobManager().listJobs()).build();
-    } catch (IOException e) {
-      throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+    @Override
+    public Response allocateNewJob(SecurityContext securityContext) throws NotFoundException {
+        return Response.ok().entity(
+                Collections.singletonMap("job-uuid", ctx.jobManager().newJobUUID())
+        ).build();
     }
-  }
 
-  @Override
-  public Response removeJob(UUID jobUUID, SecurityContext securityContext) throws NotFoundException {
-    try {
-      ctx.jobManager().removeJob(jobUUID);
-    } catch (IOException e) {
-      throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+    @Override
+    public Response getJob(UUID jobUUID, SecurityContext securityContext) throws NotFoundException {
+        try {
+            JobDefinition job = ctx.jobManager().getJob(jobUUID);
+            if (job == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            } else {
+                return Response.ok(job).build();
+            }
+        } catch (IOException e) {
+            throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+        }
     }
-    return Response.ok().build();
-  }
 
-  @Override
-  public Response updateJob(
-      UUID jobUUID,
-      JobDefinition body,
-      SecurityContext securityContext) throws NotFoundException {
-    try {
-      ctx.jobManager().updateJob(jobUUID, body);
-    } catch (IOException e) {
-      throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+    @Override
+    public Response listJob(SecurityContext securityContext) throws NotFoundException {
+        try {
+            return Response.ok(ctx.jobManager().listJobs()).build();
+        } catch (IOException e) {
+            throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+        }
     }
-    return Response.ok().build();
-  }
+
+    @Override
+    public Response removeJob(UUID jobUUID, SecurityContext securityContext) throws NotFoundException {
+        try {
+            ctx.jobManager().removeJob(jobUUID);
+        } catch (IOException e) {
+            throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+        }
+        return Response.ok().build();
+    }
+
+    @Override
+    public Response updateJob(
+            UUID jobUUID,
+            JobDefinition body,
+            SecurityContext securityContext) throws NotFoundException {
+        try {
+            ctx.jobManager().updateJob(jobUUID, body);
+        } catch (IOException e) {
+            throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+        }
+        return Response.ok().build();
+    }
+
+    @Override
+    public Response deployJob(UUID jobUUID, JobDefinition body, SecurityContext securityContext) throws NotFoundException {
+        try {
+            ctx.jobManager().deployJob(jobUUID, body);
+        } catch (IOException e) {
+            throw new NotFoundException(INVALID_REQUEST, e.getMessage());
+        }
+        return Response.ok().build();
+    }
 }

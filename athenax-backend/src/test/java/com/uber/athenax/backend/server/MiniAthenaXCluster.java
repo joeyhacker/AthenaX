@@ -29,12 +29,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -44,122 +39,155 @@ import java.util.jar.JarOutputStream;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.yarn.api.records.YarnApplicationState.FAILED;
-import static org.apache.hadoop.yarn.api.records.YarnApplicationState.FINISHED;
-import static org.apache.hadoop.yarn.api.records.YarnApplicationState.KILLED;
-import static org.apache.hadoop.yarn.conf.YarnConfiguration.RM_ADDRESS;
+import static org.apache.hadoop.yarn.api.records.YarnApplicationState.*;
 
 public class MiniAthenaXCluster implements Closeable {
-  private final File workDir;
+    private final File workDir;
 
-  private final YarnConfiguration yarnConf = new YarnConfiguration();
-  private final MiniYARNCluster yarnCluster;
+    private final YarnConfiguration yarnConf = new YarnConfiguration();
+    private final MiniYARNCluster yarnCluster;
 
-  private YarnClusterConfiguration yarnClusterConf;
+    private YarnClusterConfiguration yarnClusterConf;
 
-  public MiniAthenaXCluster(String name) {
-    this.yarnCluster = new MiniYARNCluster(name, 1, 1, 1, 1);
-    this.workDir = new File("target", name);
-  }
-
-  @Override
-  public void close() throws IOException {
-    yarnCluster.close();
-    FileContext.getLocalFSFileContext().delete(new Path(workDir.getAbsolutePath()), true);
-  }
-
-  public void start() throws IOException, URISyntaxException {
-    workDir.mkdirs();
-    createDummyUberJar(new File(workDir, "flink.jar"));
-    createEmptyFile(new File(workDir, "flink-conf.yaml"));
-    this.yarnClusterConf = prepareYarnCluster();
-  }
-
-  private static void createDummyUberJar(File dest) throws IOException {
-    try (JarOutputStream os = new JarOutputStream(new FileOutputStream(dest))) {
-      os.setComment("Dummy Flink Uber jar");
-    }
-  }
-
-  private static void createEmptyFile(File dest) throws IOException {
-    new FileWriter(dest).close();
-  }
-
-  public static YarnApplicationState pollFinishedApplicationState(YarnClient client, ApplicationId appId)
-      throws IOException, YarnException, InterruptedException {
-    EnumSet<YarnApplicationState> finishedState = EnumSet.of(FINISHED, KILLED, FAILED);
-
-    while (true) {
-      ApplicationReport report = client.getApplicationReport(appId);
-      YarnApplicationState state = report.getYarnApplicationState();
-      if (finishedState.contains(state)) {
-        return state;
-      } else {
-        Thread.sleep(250);
-      }
-    }
-  }
-
-  public YarnConfiguration getYarnConfiguration() {
-    return yarnConf;
-  }
-
-  public YarnClusterConfiguration getYarnClusterConf() {
-    return yarnClusterConf;
-  }
-
-  private YarnClusterConfiguration prepareYarnCluster() throws IOException, URISyntaxException {
-    yarnCluster.init(yarnConf);
-    yarnCluster.start();
-    yarnConf.set(RM_ADDRESS, yarnCluster.getResourceManager().getConfig().get(RM_ADDRESS));
-
-    File yarnSite = new File(workDir, "yarn-site.xml");
-    try (PrintWriter pw = new PrintWriter(new FileWriter(yarnSite))) {
-      yarnConf.writeXml(pw);
+    public MiniAthenaXCluster(String name) {
+        this.yarnCluster = new MiniYARNCluster(name, 1, 1, 1, 1);
+        this.workDir = new File("target", name);
     }
 
-    Path flinkUberJar = new Path(new File(workDir, "flink.jar").toURI());
-    Path flinkConfYaml = new Path(new File(workDir, "flink-conf.yaml").toURI());
-    @SuppressWarnings("ConstantConditions")
-    Path log4jPath = new Path(Thread.currentThread().getContextClassLoader().getResource("log4j.properties").toURI());
+    @Override
+    public void close() throws IOException {
+        yarnCluster.close();
+        FileContext.getLocalFSFileContext().delete(new Path(workDir.getAbsolutePath()), true);
+    }
 
-    Set<Path> resourcesToLocalize = new HashSet<>(Arrays.asList(flinkUberJar, flinkConfYaml, log4jPath));
+    public void start() throws IOException, URISyntaxException {
+        workDir.mkdirs();
+        createDummyUberJar(new File(workDir, "flink.jar"));
+        createEmptyFile(new File(workDir, "flink-conf.yaml"));
+        this.yarnClusterConf = prepareYarnCluster();
+    }
 
-    String home = workDir.toURI().toString();
-    return new YarnClusterConfiguration(
-        yarnConf,
-        home,
-        flinkUberJar,
-        resourcesToLocalize,
-        systemJars(yarnSite));
-  }
+    private static void createDummyUberJar(File dest) throws IOException {
+        try (JarOutputStream os = new JarOutputStream(new FileOutputStream(dest))) {
+            os.setComment("Dummy Flink Uber jar");
+        }
+    }
 
-  public File workDir() {
-    return workDir;
-  }
+    private static void createEmptyFile(File dest) throws IOException {
+        new FileWriter(dest).close();
+    }
 
-  public String generateYarnClusterConfContent(String clusterName) {
-    StringBuffer sb = new StringBuffer();
-    String parent = workDir.getAbsolutePath();
-    sb.append("clusters:\n")
-        .append(String.format("  %s:\n", clusterName))
-        .append(String.format("    yarn.site.location: %s\n", new File(parent, "yarn-site.xml").toURI()))
-        .append(String.format("    athenax.home.dir: %s\n", workDir.toURI()))
-        .append(String.format("    flink.uber.jar.location: %s\n", new File(parent, "flink.jar").toURI()))
-        .append("    localize.resources:\n");
+    public static YarnApplicationState pollFinishedApplicationState(YarnClient client, ApplicationId appId)
+            throws IOException, YarnException, InterruptedException {
+        EnumSet<YarnApplicationState> finishedState = EnumSet.of(FINISHED, KILLED, FAILED);
 
-    yarnClusterConf.resourcesToLocalize().forEach(x -> sb.append(String.format("      - %s\n", x.toUri())));
+        while (true) {
+            ApplicationReport report = client.getApplicationReport(appId);
+            YarnApplicationState state = report.getYarnApplicationState();
+            if (finishedState.contains(state)) {
+                return state;
+            } else {
+                Thread.sleep(250);
+            }
+        }
+    }
 
-    sb.append("    additional.jars:\n");
-    yarnClusterConf.systemJars().forEach(x -> sb.append(String.format("      - %s\n", x.toUri())));
-    return sb.toString();
-  }
+    public YarnConfiguration getYarnConfiguration() {
+        return yarnConf;
+    }
 
-  private static Set<Path> systemJars(File yarnSite) throws URISyntaxException {
-    String[] jars = System.getProperty("java.class.path").split(Pattern.quote(File.pathSeparator));
-    Set<Path> res = Arrays.stream(jars).map(File::new).filter(File::isFile)
-        .map(x -> new Path(x.toURI())).collect(Collectors.toSet());
-    res.add(new Path(yarnSite.toURI()));
-    return res;
-  }
+    public YarnClusterConfiguration getYarnClusterConf() {
+        return yarnClusterConf;
+    }
+
+    private YarnClusterConfiguration prepareYarnCluster() throws IOException, URISyntaxException {
+
+        yarnConf.addResource(new Path("/Users/joey/tmp/hadoop1/yarn-site.xml"));
+//    yarnCluster.init(yarnConf);
+//    yarnCluster.start();
+//    yarnConf.set(RM_ADDRESS, yarnCluster.getResourceManager().getConfig().get(RM_ADDRESS));
+
+        File yarnSite = new File(workDir, "yarn-site.xml");
+        try (PrintWriter pw = new PrintWriter(new FileWriter(yarnSite))) {
+            yarnConf.writeXml(pw);
+        }
+
+        Path flinkUberJar = new Path(new File(workDir, "flink.jar").toURI());
+        Path flinkConfYaml = new Path(new File(workDir, "flink-conf.yaml").toURI());
+        @SuppressWarnings("ConstantConditions")
+        Path log4jPath = new Path(Thread.currentThread().getContextClassLoader().getResource("log4j.properties").toURI());
+
+        Set<Path> resourcesToLocalize = new HashSet<>(Arrays.asList(flinkUberJar, flinkConfYaml, log4jPath));
+
+        String home = workDir.toURI().toString();
+        return new YarnClusterConfiguration(
+                yarnConf,
+                home,
+                flinkUberJar,
+                resourcesToLocalize,
+                systemJars(yarnSite));
+    }
+
+    public File workDir() {
+        return workDir;
+    }
+
+    public String generateYarnClusterConfContent(String clusterName) {
+        StringBuffer sb = new StringBuffer();
+        String parent = workDir.getAbsolutePath();
+        sb.append("clusters:\n")
+                .append(String.format("  %s:\n", clusterName))
+                .append(String.format("    yarn.site.location: %s\n", new File(parent, "yarn-site.xml").toURI()))
+                .append(String.format("    athenax.home.dir: %s\n", workDir.toURI()))
+                .append(String.format("    flink.uber.jar.location: %s\n", new File(parent, "flink.jar").toURI()))
+                .append("    localize.resources:\n");
+
+        yarnClusterConf.resourcesToLocalize().forEach(x -> sb.append(String.format("      - %s\n", x.toUri())));
+
+        sb.append("    additional.jars:\n");
+        yarnClusterConf.systemJars().forEach(x -> sb.append(String.format("      - %s\n", x.toUri())));
+        return sb.toString();
+    }
+
+    public String generateYarnClusterConfContentForHdfs(String clusterName) {
+        StringBuffer sb = new StringBuffer();
+        String parent = workDir.getAbsolutePath();
+        String workdir = "/tmp/athenax";
+        sb.append("clusters:\n")
+                .append(String.format("  %s:\n", clusterName))
+                .append(String.format("    yarn.site.location: %s\n", new File(parent, "yarn-site.xml").toURI()))
+                .append(String.format("    athenax.home.dir: %s\n", workDir.toURI()))
+                .append(String.format("    flink.uber.jar.location: %s\n", new File(parent, "flink.jar").toURI()))
+                .append("    localize.resources:\n");
+
+        yarnClusterConf.resourcesToLocalize().forEach(x -> sb.append(String.format("      - %s\n", getHdfsPath(x.toUri().toString(), workdir))));
+
+        sb.append("    additional.jars:\n");
+        yarnClusterConf.systemJars().forEach(x -> sb.append(String.format("      - %s\n", getHdfsPath(x.toUri().toString(), workdir + "/libs"))));
+        return sb.toString();
+    }
+
+
+    public String getHdfsPath(String filePath, String targetPath) {
+        int idx = filePath.lastIndexOf("/");
+        String fileName = filePath.substring(idx);
+        targetPath = targetPath + fileName;
+        try {
+            if (!HdfsUtil.getInstance().exist(targetPath)) {
+                HdfsUtil.getInstance().upload(filePath, targetPath);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return targetPath;
+    }
+
+
+    private static Set<Path> systemJars(File yarnSite) throws URISyntaxException {
+        String[] jars = System.getProperty("java.class.path").split(Pattern.quote(File.pathSeparator));
+        Set<Path> res = Arrays.stream(jars).map(File::new).filter(File::isFile)
+                .map(x -> new Path(x.toURI())).collect(Collectors.toSet());
+        res.add(new Path(yarnSite.toURI()));
+        return res;
+    }
 }

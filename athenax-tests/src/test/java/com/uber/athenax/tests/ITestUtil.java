@@ -32,7 +32,6 @@ import org.apache.flink.table.api.TableNotExistException;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.catalog.ExternalCatalog;
 import org.apache.flink.table.catalog.ExternalCatalogTable;
-import org.apache.flink.util.Preconditions;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -45,11 +44,7 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static com.uber.athenax.backend.server.AthenaXExtraConfigOptions.INSTANCE_MANAGER_RESCAN_INTERVAL;
 import static com.uber.athenax.backend.server.AthenaXExtraConfigOptions.JOBSTORE_LEVELDB_FILE;
@@ -58,7 +53,7 @@ import static com.uber.athenax.vm.connectors.kafka.KafkaConnectorConfigKeys.TOPI
 
 final class ITestUtil {
   static final String DEST_TOPIC = "bar";
-  static final String SOURCE_TOPIC = "foo";
+  static final String SOURCE_TOPIC = "foo1";
 
   private static final long STABILIZE_SLEEP_DELAYS = 3000;
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -93,7 +88,7 @@ final class ITestUtil {
       Map<String, String> sourceTableProp = new HashMap<>();
       sourceTableProp.put(KAFKA_CONFIG_PREFIX + ConsumerConfig.GROUP_ID_CONFIG, tableName);
       sourceTableProp.put(KAFKA_CONFIG_PREFIX + CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, broker);
-      sourceTableProp.put(KAFKA_CONFIG_PREFIX + ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+      sourceTableProp.put(KAFKA_CONFIG_PREFIX + ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
       sourceTableProp.put(TOPIC_NAME_KEY, tableName);
       return new KafkaInputExternalCatalogTable(sourceTableProp);
     }
@@ -115,9 +110,12 @@ final class ITestUtil {
   }
 
   public static class CatalogProvider implements AthenaXTableCatalogProvider {
+
+    private static String brokerAddress = "node3:9092";
+
     @Override
     public Map<String, AthenaXTableCatalog> getInputCatalog(String cluster) {
-      Preconditions.checkNotNull(brokerAddress);
+//      Preconditions.checkNotNull(brokerAddress);
       return Collections.singletonMap(
           "input",
           new KafkaCatalog(brokerAddress, Collections.singletonList(SOURCE_TOPIC)));
@@ -125,7 +123,7 @@ final class ITestUtil {
 
     @Override
     public AthenaXTableCatalog getOutputCatalog(String cluster, List<String> outputs) {
-      Preconditions.checkNotNull(brokerAddress);
+//      Preconditions.checkNotNull(brokerAddress);
       return new KafkaCatalog(brokerAddress, Collections.singletonList(DEST_TOPIC));
     }
   }

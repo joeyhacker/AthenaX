@@ -161,7 +161,7 @@ paths:
           description: successful operation
           schema:
             $ref: '#/definitions/JobDefinition'
-    post:
+    put:
       tags:
         - jobs
       operationId: updateJob
@@ -177,6 +177,28 @@ paths:
           format: uuid
         - in: body
           name: body
+          description: The application to be run
+          required: true
+          schema:
+            $ref: '#/definitions/JobDefinition'
+      responses:
+        '200':
+          description: successful operation
+    post:
+      tags:
+        - jobs
+      operationId: deployJob
+      summary: >-
+        Deploy the definition of a job.
+      parameters:
+        - name: jobUUID
+          in: path
+          required: true
+          description: UUID of the job
+          type: string
+          format: uuid
+        - name: body
+          in: body
           description: The application to be run
           required: true
           schema:

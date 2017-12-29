@@ -50,9 +50,9 @@ public final class ServerContext {
     this.conf = conf;
     this.jobStore = (JobStore) instantiate(Class.forName(conf.jobStoreImpl()));
     this.catalogs = (AthenaXTableCatalogProvider) instantiate(Class.forName(conf.catalogProvider()));
-    this.jobManager = new JobManager(jobStore, catalogs);
     this.instanceManager = InstanceManager.create(conf, jobManager, executor);
     this.watchdogPolicy = (WatchdogPolicy) instantiate(Class.forName(conf.watchdogPolicyImpl()));
+    this.jobManager = new JobManager(jobStore, catalogs, instanceManager);
   }
 
   public WatchdogPolicy watchdogPolicy() {
